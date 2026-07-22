@@ -19,15 +19,20 @@ angular.module('sdlctoolApp', ['LocalStorageModule',
 ])
     /* jshint unused: false*/
     .run(function ($rootScope, $location, $window, $http, $state, Auth, Principal, ENV, VERSION, Account, $confirm) {
+        console.log(Principal.isAuthenticated());
         $rootScope.ENV = ENV;
         $rootScope.VERSION = VERSION;
         $rootScope.AUTHENTICATIONTYPE = '';
         $rootScope.AUTHENTICATIONTYPELDAP = '';
+        $rootScope.AUTHENTICATIONTYPEOIDC = '';
+        $rootScope.OIDC_REGISTRATION_ID = '';
         $rootScope.REGISTRATIONTYPE = '';
         $http.get('api/authentication_config').then(function (result) {
-            $rootScope.AUTHENTICATIONTYPE = result.data.type === 'CAS' ? true : false;
+            $rootScope.AUTHENTICATIONTYPE = result.data.type === 'CAS' || result.data.type === 'OIDC' ? true : false;
             $rootScope.AUTHENTICATIONTYPELDAP = result.data.type === 'LDAP' ? true : false;
             $rootScope.REGISTRATIONTYPE = result.data.registration;
+            $rootScope.AUTHENTICATIONTYPEOIDC = result.data.type === 'OIDC' ? true : false;
+            $rootScope.OIDC_REGISTRATION_ID = result.data.oidcRegistrationId || result.data.oidcClientId || null;
             if (result.data.type === 'CAS') {
                 $rootScope.CASLOGOUTURL = result.data.casLogout;
             }

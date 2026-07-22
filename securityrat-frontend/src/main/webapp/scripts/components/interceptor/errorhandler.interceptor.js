@@ -11,8 +11,9 @@ angular.module('sdlctoolApp')
                 if (!(response.status == 401 && response.data.path !== undefined && response.data.path.indexOf("/api/account") == 0 )){
 	                $rootScope.$emit('sdlctoolApp.httpError', response);
 	            }
-                if(response.status === -1 && response.data === null && 
-                    ((restApi.filter(filterUrl).length > 0) || (response.config.url.indexOf(window.location.host) !== -1))) {
+				var isOnLogoutPage = window.location && window.location.pathname === '/logout';
+				if(response.status === -1 && response.data === null && !isOnLogoutPage &&
+					((restApi.filter(filterUrl).length > 0) || (response.config.url.indexOf(window.location.host) !== -1))) {
                 	if(document.getElementById("redirect") === null) {
 	                	var appUrl  = window.location.origin ? window.location.origin : window.location.protocol + '//' + window.location.href + (window.location.port ? ':' + window.location.port: '');
 	        			alert('Your Session has expired. The link '+ appUrl +' will be opened in a new tab to refresh your session.');

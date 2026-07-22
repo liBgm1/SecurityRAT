@@ -7,10 +7,13 @@ public class AuthenticationConfigDto implements Dto {
     public enum Type {
         FORM,
         CAS,
-        LDAP
+        LDAP,
+        OIDC
     }
     
     private Type type;
     private Boolean registration;
     private String casLogout;
+    private String oidcClientId;
+    private String oidcRegistrationId;
 }

@@ -116,6 +116,14 @@ spring:
           azure:
             client-id: $CLIENT_ID
             client-secret: $CLIENT_SECRET
+          oidc:
+            provider: oidc
+            client-id: ${application.oidc.clientId}
+            client-secret: ${application.oidc.clientSecret}
+            scope: "openid"
+        provider:
+          oidc:
+            issuer-uri: ${application.oidc.issuerUri}
 
 azure:
     activedirectory:
@@ -176,7 +184,7 @@ jhipster:
 
 application:
   authentication:
-    type: FORM # possible values are CAS, FORM, LDAP or AZURE
+    type: FORM # possible values are CAS, FORM, LDAP, OIDC or AZURE
     registration: true # restrict the registration only to the administrators by setting the value to 'false'
   cas:
     loginUrl: https://localhost:8443/cas # Change to the URL your CAS server listens on
@@ -196,3 +204,8 @@ application:
     groupOfAdmins: admin-group
     groupOfTrainers: trainer-group
     #groupOfUsers:
+  oidc:
+    issuerUri: http://localhost:8080/realms/example-realm
+    clientId: <client-id>
+    clientSecret: <client-secret>
+    rolesClaimPath: <claim-path>

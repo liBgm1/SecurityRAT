@@ -7,6 +7,11 @@ angular.module('sdlctoolApp')
         $scope.rememberMe = true;
         $('#username').focus();
         $timeout(function() {$('#username').focus();});
+        if ($rootScope.AUTHENTICATIONTYPEOIDC) {
+            var registrationId = $rootScope.OIDC_REGISTRATION_ID || $rootScope.OIDC_CLIENT_ID || 'oidc';
+            window.location.href = '/oauth2/authorization/' + registrationId;
+            return;
+        }
         $scope.login = function (event) {
             event.preventDefault();
             Auth.login({

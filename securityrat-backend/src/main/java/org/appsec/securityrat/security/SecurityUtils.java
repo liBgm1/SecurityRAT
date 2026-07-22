@@ -8,6 +8,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.ldap.userdetails.LdapUserDetails;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -49,6 +50,15 @@ public final class SecurityUtils {
         return false;
     }
 
+    public static boolean isOidcAuthentication() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if(authentication != null && authentication.getPrincipal() instanceof OidcUser) {
+            log.debug("OIDC Authentication");
+            return true;
+        }
+        return false;
+    }
+
     private static String extractPrincipal(Authentication authentication) {
         if (authentication == null) {
             return null;
@@ -62,6 +72,9 @@ public final class SecurityUtils {
         } else if (authentication.getPrincipal() instanceof LdapUserDetails) {
         	LdapUserDetails ldapUser = (LdapUserDetails) authentication.getPrincipal();
         	return ldapUser.getUsername();
+        } else if (authentication.getPrincipal() instanceof OidcUser) {
+            OidcUser auth = (OidcUser) authentication.getPrincipal();
+            return auth.getPreferredUsername() != null ? auth.getPreferredUsername() : auth.getName();
         } else if (authentication.getPrincipal() instanceof String) {
             return (String) authentication.getPrincipal();
         }
@@ -98,5 +111,4 @@ public final class SecurityUtils {
         return authentication.getAuthorities().stream()
             .map(GrantedAuthority::getAuthority);
     }
-
 }

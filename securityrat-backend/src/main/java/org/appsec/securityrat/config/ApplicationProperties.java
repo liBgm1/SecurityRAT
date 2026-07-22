@@ -17,7 +17,8 @@ public class ApplicationProperties {
         CAS,
         FORM,
         AZURE,
-        LDAP
+        LDAP,
+        OIDC
     }
 
     @Data
@@ -48,7 +49,18 @@ public class ApplicationProperties {
       	private String groupOfUsers;
     }
 
+    @Data
+    public static class Oidc {
+        private URL logoutUrl;
+        private String issuerUri;
+        private String clientId;
+        private String clientSecret;
+        private String scope;
+        private String rolesClaimPath;
+    }
+
     private Authentication authentication;
     private Cas cas;
     private Ldap ldap;
+    private Oidc oidc;
 }

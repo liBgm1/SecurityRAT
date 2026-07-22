@@ -4,16 +4,12 @@ import io.github.jhipster.config.JHipsterProperties;
 import io.github.jhipster.security.AjaxAuthenticationFailureHandler;
 import io.github.jhipster.security.AjaxAuthenticationSuccessHandler;
 import io.github.jhipster.security.AjaxLogoutSuccessHandler;
-
-import javax.inject.Inject;
-
 import lombok.extern.slf4j.Slf4j;
-
+import org.appsec.securityrat.provider.mapper.OidcAuthoritiesMapper;
 import org.appsec.securityrat.provider.mapper.LdapUserDetailsContextMapper;
 import org.appsec.securityrat.security.AuthoritiesConstants;
 import org.appsec.securityrat.security.Http401UnauthorizedEntryPoint;
 import org.appsec.securityrat.web.filter.CsrfCookieGeneratorFilter;
-
 import org.pac4j.core.config.Config;
 import org.pac4j.springframework.security.web.CallbackFilter;
 import org.pac4j.springframework.security.web.Pac4jEntryPoint;
@@ -21,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -28,17 +25,30 @@ import org.springframework.security.config.annotation.web.builders.WebSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
 import org.springframework.security.config.annotation.web.configurers.ExceptionHandlingConfigurer;
-import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
-import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
-import org.springframework.security.web.AuthenticationEntryPoint;
-import org.springframework.security.web.authentication.RememberMeServices;
-import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
-import org.springframework.security.web.csrf.CsrfFilter;
+import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.data.repository.query.SecurityEvaluationContextExtension;
+import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
+import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
+import org.springframework.security.oauth2.client.oidc.web.logout.OidcClientInitiatedLogoutSuccessHandler;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
+import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
+import org.springframework.security.web.AuthenticationEntryPoint;
+import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.security.web.authentication.RememberMeServices;
+import org.springframework.security.web.authentication.logout.LogoutSuccessHandler;
+import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
+import org.springframework.security.web.csrf.CsrfFilter;
+
+import javax.inject.Inject;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.util.Set;
 
 @Configuration
 @EnableWebSecurity
@@ -73,11 +83,17 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
     @Inject
     private ApplicationProperties appConfig;
 
+    @Inject
+    private OidcAuthoritiesMapper oidcAuthoritiesMapper;
+
     @Autowired
     private Config pac4jConfig;
 
     @Autowired
     private OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService;
+
+    @Autowired
+    private ClientRegistrationRepository clientRegistrationRepository;
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -224,6 +240,50 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
                     .oidcUserService(oidcUserService);
                 break;
 
+            case OIDC:
+                http.authorizeRequests().antMatchers("/").permitAll()
+                    .and()
+                    .exceptionHandling()
+                    .defaultAuthenticationEntryPointFor(
+                        new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED),
+                        new org.springframework.security.web.util.matcher.AntPathRequestMatcher("/api/**"))
+                    .and()
+                    .exceptionHandling()
+                    .authenticationEntryPoint((HttpServletRequest request, HttpServletResponse response, AuthenticationException authException) -> {
+                        String accept = request.getHeader("Accept");
+                        String xrw = request.getHeader("X-Requested-With");
+                        boolean isAjax = "XMLHttpRequest".equals(xrw) || (accept != null && accept.contains("application/json"));
+                        if (isAjax) {
+                            response.sendError(HttpServletResponse.SC_UNAUTHORIZED);
+                        } else {
+                            response.sendRedirect("/login");
+                        }
+                    })
+                    .and()
+                    .oauth2Login(auth2 -> auth2
+                        .userInfoEndpoint(userInfo -> userInfo
+                            .oidcUserService(this.oidcUserService())
+                        )
+                    )
+                    .logout(logout -> logout
+                        .logoutUrl("/api/logout")
+                        .logoutSuccessHandler(this.ajaxLogoutSuccessHandler)
+                        .deleteCookies("JSESSIONID")
+                        .permitAll()
+                    )
+                    .authorizeRequests()
+                    .antMatchers(registerApiUri).denyAll()
+                    .antMatchers("/api/activate").denyAll()
+                    .antMatchers("/api/account/reset_password/init").denyAll()
+                    .antMatchers("/api/account/reset_password/finish").denyAll()
+                    .antMatchers("/api/account/sessions").denyAll()
+                    .antMatchers("/api/account/confirm_password").denyAll()
+                    .antMatchers("/api/account/change_password").denyAll()
+                    .antMatchers("/api/authenticate").denyAll()
+                    .antMatchers("/settings").denyAll()
+                    .antMatchers("/password").denyAll();
+                break;
+
             default:
                 throw new UnsupportedOperationException();
         }
@@ -257,6 +317,17 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
             .antMatchers("/protected/**").authenticated();
     }
 
+    public OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService() {
+        final OidcUserService delegate = new OidcUserService();
+        return (userRequest) -> {
+            OidcUser oidcUser = delegate.loadUser(userRequest);
+            Set<? extends GrantedAuthority> mappedAuthorities =
+                this.oidcAuthoritiesMapper.mapAuthorities(oidcUser, userRequest.getAccessToken());
+            oidcUser = new DefaultOidcUser(mappedAuthorities, oidcUser.getIdToken(), oidcUser.getUserInfo());
+            return oidcUser;
+        };
+    }
+
     @Inject
     public void configureGlobal(AuthenticationManagerBuilder auth)
         throws Exception {
@@ -272,6 +343,9 @@ public class SecurityConfiguration extends WebSecurityConfigurerAdapter {
                 break;
 
             case AZURE:
+                auth.userDetailsService(this.userDetailsService);
+                break;
+            case OIDC:
                 auth.userDetailsService(this.userDetailsService);
                 break;
 

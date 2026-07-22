@@ -2,6 +2,14 @@
 
 angular.module('sdlctoolApp')
     .config(function ($stateProvider) {
+        function redirectToHomeIfOidc($rootScope, $state, $timeout) {
+            if ($rootScope.AUTHENTICATIONTYPEOIDC) {
+                $timeout(function () {
+                    $state.go('editor');
+                });
+            }
+        }
+
         $stateProvider
             .state('userManagement', {
                 parent: 'admin',
@@ -10,6 +18,7 @@ angular.module('sdlctoolApp')
                     roles: ['ROLE_ADMIN'],
                     pageTitle: 'userManagement'
                 },
+                onEnter: ['$rootScope', '$state', '$timeout', redirectToHomeIfOidc],
                 views: {
                     'content@': {
                         templateUrl: 'scripts/app/admin/userManagement/userManagement.html',
